@@ -1,0 +1,6 @@
+Platform Backend Engineer
+
+We are hiring a backend engineer to build recruiting platform services at scale.
+The role needs strong Python, Django, Postgres, Redis, Celery, and API design experience.
+Experience with vector search, retrieval pipelines, ranking systems, resume parsing, and production observability is a strong plus.
+The engineer should be comfortable designing asynchronous document ingestion flows and turning unstructured data into ranked candidate outputs.

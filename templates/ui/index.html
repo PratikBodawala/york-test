@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Recruiting RAG POC</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: Arial, sans-serif;
+            background: #f5f7fb;
+            color: #1f2937;
+        }
+        main {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 24px;
+        }
+        h1, h2, h3 {
+            margin-top: 0;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 20px;
+        }
+        .card {
+            background: #ffffff;
+            border: 1px solid #dbe2ea;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+        }
+        label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+        input, textarea, button {
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 14px;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid #cbd5e1;
+            font: inherit;
+        }
+        textarea {
+            min-height: 160px;
+            resize: vertical;
+        }
+        button {
+            background: #2563eb;
+            color: white;
+            font-weight: 600;
+            border: none;
+            cursor: pointer;
+        }
+        button.secondary {
+            background: #475569;
+        }
+        pre {
+            white-space: pre-wrap;
+            word-break: break-word;
+            background: #0f172a;
+            color: #e2e8f0;
+            padding: 12px;
+            border-radius: 8px;
+            min-height: 80px;
+        }
+        .list-item {
+            border-top: 1px solid #e2e8f0;
+            padding: 12px 0;
+        }
+        .list-item:first-child {
+            border-top: none;
+            padding-top: 0;
+        }
+        .muted {
+            color: #64748b;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Recruiting RAG POC</h1>
+    <p class="muted">Upload resumes, submit a job description, and inspect ingestion or Top 10 match results from one page.</p>
+
+    <div class="grid">
+        <section class="card">
+            <h2>Upload Candidate Resume</h2>
+            <form id="upload-form">
+                <label for="file">Resume file</label>
+                <input id="file" name="file" type="file" accept=".pdf,.docx" required>
+                <p class="muted">Candidate name is inferred from the filename, for example `alice_martin_resume.pdf`.</p>
+
+                <button type="submit">Upload And Queue Ingestion</button>
+            </form>
+            <h3>Upload Response</h3>
+            <pre id="upload-response">No upload submitted yet.</pre>
+        </section>
+
+        <section class="card">
+            <h2>Submit Job Description</h2>
+            <form id="match-form">
+                <label for="title">Role title</label>
+                <input id="title" name="title" required>
+
+                <label for="description_text">Job description</label>
+                <textarea id="description_text" name="description_text" required></textarea>
+
+                <label for="retrieval_k">Retrieval pool size</label>
+                <input id="retrieval_k" name="retrieval_k" type="number" value="50" min="10">
+
+                <label for="top_k">Top candidates returned</label>
+                <input id="top_k" name="top_k" type="number" value="10" min="1" max="10">
+
+                <button type="submit">Queue Matching Job</button>
+            </form>
+            <h3>Match Response</h3>
+            <pre id="match-response">No matching job submitted yet.</pre>
+        </section>
+    </div>
+
+    <div class="grid" style="margin-top: 20px;">
+        <section class="card">
+            <h2>Check Document Status</h2>
+            <form id="document-status-form">
+                <label for="document_id">Document ID</label>
+                <input id="document_id" name="document_id" type="number" required>
+                <button class="secondary" type="submit">Load Document Status</button>
+            </form>
+            <pre id="document-status-response">No document status loaded yet.</pre>
+        </section>
+
+        <section class="card">
+            <h2>Check Match Results</h2>
+            <form id="match-status-form">
+                <label for="job_request_id">Job request ID</label>
+                <input id="job_request_id" name="job_request_id" type="number" required>
+                <button class="secondary" type="submit">Load Match Results</button>
+            </form>
+            <pre id="match-status-response">No match results loaded yet.</pre>
+        </section>
+    </div>
+
+    <div class="grid" style="margin-top: 20px;">
+        <section class="card">
+            <h2>Recent Documents</h2>
+            {% for document in recent_documents %}
+                <div class="list-item">
+                    <strong>#{{ document.id }}</strong> {{ document.original_filename }}<br>
+                    <span class="muted">{{ document.candidate.display_name }} | {{ document.parse_status }} | {{ document.mime_type|default:"unknown" }}</span>
+                </div>
+            {% empty %}
+                <p class="muted">No documents uploaded yet.</p>
+            {% endfor %}
+        </section>
+
+        <section class="card">
+            <h2>Recent Match Jobs</h2>
+            {% for job_request in recent_job_requests %}
+                <div class="list-item">
+                    <strong>#{{ job_request.id }}</strong> {{ job_request.title }}<br>
+                    <span class="muted">{{ job_request.status }} | top {{ job_request.top_k }}</span>
+                </div>
+            {% empty %}
+                <p class="muted">No match jobs submitted yet.</p>
+            {% endfor %}
+        </section>
+    </div>
+</main>
+
+<script>
+    function prettyJson(data) {
+        return JSON.stringify(data, null, 2);
+    }
+
+    async function handleJsonResponse(response, outputId) {
+        const data = await response.json();
+        document.getElementById(outputId).textContent = prettyJson(data);
+        return data;
+    }
+
+    document.getElementById("upload-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(event.target);
+        const response = await fetch("/api/candidates/upload/", {
+            method: "POST",
+            body: formData
+        });
+        const data = await handleJsonResponse(response, "upload-response");
+        if (data.document_id) {
+            document.getElementById("document_id").value = data.document_id;
+        }
+    });
+
+    document.getElementById("match-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const form = event.target;
+        const payload = {
+            title: form.title.value,
+            description_text: form.description_text.value,
+            retrieval_k: Number(form.retrieval_k.value),
+            top_k: Number(form.top_k.value)
+        };
+        const response = await fetch("/api/matches/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(payload)
+        });
+        const data = await handleJsonResponse(response, "match-response");
+        if (data.job_request_id) {
+            document.getElementById("job_request_id").value = data.job_request_id;
+        }
+    });
+
+    document.getElementById("document-status-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const documentId = document.getElementById("document_id").value;
+        const response = await fetch(`/api/documents/${documentId}/`);
+        await handleJsonResponse(response, "document-status-response");
+    });
+
+    document.getElementById("match-status-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const jobRequestId = document.getElementById("job_request_id").value;
+        const response = await fetch(`/api/matches/${jobRequestId}/`);
+        await handleJsonResponse(response, "match-status-response");
+    });
+</script>
+</body>
+</html>
