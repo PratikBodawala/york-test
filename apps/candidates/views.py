@@ -1,5 +1,3 @@
-import re
-from pathlib import Path
 from uuid import uuid4
 
 from django.http import HttpRequest, JsonResponse
@@ -9,34 +7,14 @@ from django.views.decorators.http import require_GET, require_http_methods
 from apps.documents.models import Document
 from apps.ingestion.tasks import parse_and_index_document
 
+from .name_extraction import infer_candidate_profile_from_resume_text
 from .models import Candidate
 
 
-def derive_candidate_identity(file_name: str) -> dict[str, str]:
-    file_stem = Path(file_name).stem
-    tokens = [token for token in re.split(r"[^A-Za-z0-9]+", file_stem) if token]
-    filtered_tokens = [
-        token for token in tokens if token.lower() not in {"resume", "cv", "profile"}
-    ]
-    if filtered_tokens:
-        tokens = filtered_tokens
-
-    if not tokens:
-        first_name = "Uploaded"
-        last_name = "Candidate"
-    elif len(tokens) == 1:
-        first_name = tokens[0].title()
-        last_name = "Candidate"
-    else:
-        first_name = tokens[0].title()
-        last_name = " ".join(token.title() for token in tokens[1:])
-
-    return {
-        "first_name": first_name,
-        "last_name": last_name,
-        "headline": " ".join(token.title() for token in tokens).strip() or "Uploaded Candidate",
-        "email": f"uploaded-{uuid4().hex[:12]}@local.resume",
-    }
+def build_pending_candidate_profile() -> dict[str, str]:
+    candidate_data = infer_candidate_profile_from_resume_text("")
+    candidate_data["email"] = f"uploaded-{uuid4().hex[:12]}@local.resume"
+    return candidate_data
 
 
 @csrf_exempt
@@ -53,7 +31,7 @@ def upload_candidate_resume(request: HttpRequest) -> JsonResponse:
 
     uploads: list[dict] = []
     for uploaded_file in uploaded_files:
-        candidate_data = derive_candidate_identity(uploaded_file.name)
+        candidate_data = build_pending_candidate_profile()
         candidate = Candidate.objects.create(
             first_name=candidate_data["first_name"],
             last_name=candidate_data["last_name"],
@@ -70,6 +48,7 @@ def upload_candidate_resume(request: HttpRequest) -> JsonResponse:
             {
                 "candidate_id": candidate.id,
                 "candidate_name": candidate.display_name,
+                "name_source": "resume_content_pending",
                 "document_id": document.id,
                 "file_name": document.original_filename,
                 "parse_status": document.parse_status,

@@ -6,6 +6,7 @@ from pathlib import Path
 from celery import shared_task
 from django.utils import timezone
 
+from apps.candidates.name_extraction import infer_candidate_profile_from_resume_text
 from apps.documents.models import Document, DocumentChunk, ParseStatus
 from apps.search.chunking import build_chunks
 from apps.search.vectorstore import get_vector_store, normalize_metadata
@@ -39,6 +40,12 @@ def parse_and_index_document(document_id: int) -> dict:
         parsed_document = parser.parse(file_path)
         if not parsed_document.text.strip():
             raise ValueError("The parser did not extract any text from the document.")
+
+        candidate_profile = infer_candidate_profile_from_resume_text(parsed_document.text)
+        document.candidate.first_name = candidate_profile["first_name"]
+        document.candidate.last_name = candidate_profile["last_name"]
+        document.candidate.headline = candidate_profile["headline"]
+        document.candidate.save(update_fields=["first_name", "last_name", "headline", "updated_at"])
 
         vector_store = get_vector_store()
         old_vector_ids = list(document.chunks.values_list("vector_document_id", flat=True))

@@ -105,7 +105,7 @@ Multipart form fields:
 
 - `files`
 
-Attach one or many files under the `files` field. The API derives a lightweight candidate profile from each uploaded filename and creates a synthetic local email for the POC.
+Attach one or many files under the `files` field. The API creates a placeholder candidate first, then the ingestion task updates the candidate `display_name` and headline from parsed resume content. A synthetic local email is still created for the POC.
 
 ### Submit Job Description
 
