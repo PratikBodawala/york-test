@@ -42,30 +42,45 @@ def derive_candidate_identity(file_name: str) -> dict[str, str]:
 @csrf_exempt
 @require_http_methods(["POST"])
 def upload_candidate_resume(request: HttpRequest) -> JsonResponse:
-    uploaded_file = request.FILES.get("file")
-    if uploaded_file is None:
-        return JsonResponse({"error": "A resume file is required."}, status=400)
+    uploaded_files = request.FILES.getlist("files")
+    if not uploaded_files:
+        uploaded_file = request.FILES.get("file")
+        if uploaded_file is not None:
+            uploaded_files = [uploaded_file]
 
-    candidate_data = derive_candidate_identity(uploaded_file.name)
-    candidate = Candidate.objects.create(
-        first_name=candidate_data["first_name"],
-        last_name=candidate_data["last_name"],
-        email=candidate_data["email"],
-        headline=candidate_data["headline"],
-    )
-    document = Document.objects.create(
-        candidate=candidate,
-        uploaded_file=uploaded_file,
-        original_filename=uploaded_file.name,
-    )
-    async_result = parse_and_index_document.apply_async(args=(document.id,))
+    if not uploaded_files:
+        return JsonResponse({"error": "At least one resume file is required."}, status=400)
+
+    uploads: list[dict] = []
+    for uploaded_file in uploaded_files:
+        candidate_data = derive_candidate_identity(uploaded_file.name)
+        candidate = Candidate.objects.create(
+            first_name=candidate_data["first_name"],
+            last_name=candidate_data["last_name"],
+            email=candidate_data["email"],
+            headline=candidate_data["headline"],
+        )
+        document = Document.objects.create(
+            candidate=candidate,
+            uploaded_file=uploaded_file,
+            original_filename=uploaded_file.name,
+        )
+        async_result = parse_and_index_document.apply_async(args=(document.id,))
+        uploads.append(
+            {
+                "candidate_id": candidate.id,
+                "candidate_name": candidate.display_name,
+                "document_id": document.id,
+                "file_name": document.original_filename,
+                "parse_status": document.parse_status,
+                "task_id": async_result.id,
+            }
+        )
+
     return JsonResponse(
         {
-            "candidate_id": candidate.id,
-            "candidate_name": candidate.display_name,
-            "document_id": document.id,
-            "parse_status": document.parse_status,
-            "task_id": async_result.id,
+            "upload_count": len(uploads),
+            "uploads": uploads,
         },
         status=202,
     )

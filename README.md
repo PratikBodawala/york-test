@@ -12,7 +12,7 @@ Thin-slice Django proof of concept for AI-native candidate matching. The app ing
 
 ## Features
 
-- Upload candidate resumes from the browser UI or API
+- Upload one or many candidate resumes from the browser UI or API
 - Detect file format using MIME type
 - Parse at least PDF and DOCX with an extensible parser registry
 - Queue one job to parse and index documents into PGVector
@@ -64,7 +64,7 @@ uv run python manage.py runserver
 
 The root page `/` is the simplest interaction surface.
 
-- Upload a candidate resume file only
+- Upload one or more candidate resume files
 - Submit a job title plus job description text
 - Check ingestion status by `document_id`
 - Check ranked candidate results by `job_request_id`
@@ -103,9 +103,9 @@ This command:
 
 Multipart form fields:
 
-- `file`
+- `files`
 
-The API derives a lightweight candidate profile from the uploaded filename and creates a synthetic local email for the POC.
+Attach one or many files under the `files` field. The API derives a lightweight candidate profile from each uploaded filename and creates a synthetic local email for the POC.
 
 ### Submit Job Description
 

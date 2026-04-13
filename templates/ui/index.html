@@ -89,13 +89,13 @@
 
     <div class="grid">
         <section class="card">
-            <h2>Upload Candidate Resume</h2>
+            <h2>Upload Candidate Resumes</h2>
             <form id="upload-form">
-                <label for="file">Resume file</label>
-                <input id="file" name="file" type="file" accept=".pdf,.docx" required>
-                <p class="muted">Candidate name is inferred from the filename, for example `alice_martin_resume.pdf`.</p>
+                <label for="files">Resume files</label>
+                <input id="files" name="files" type="file" accept=".pdf,.docx" multiple required>
+                <p class="muted">Candidate names are inferred from each filename, for example `alice_martin_resume.pdf`.</p>
 
-                <button type="submit">Upload And Queue Ingestion</button>
+                <button type="submit">Upload Files And Queue Ingestion</button>
             </form>
             <h3>Upload Response</h3>
             <pre id="upload-response">No upload submitted yet.</pre>
@@ -191,8 +191,8 @@
             body: formData
         });
         const data = await handleJsonResponse(response, "upload-response");
-        if (data.document_id) {
-            document.getElementById("document_id").value = data.document_id;
+        if (data.uploads && data.uploads.length > 0) {
+            document.getElementById("document_id").value = data.uploads[0].document_id;
         }
     });
 
